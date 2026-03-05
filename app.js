@@ -1,4 +1,4 @@
-// app.js — versió robusta (CTTI numèric o text, dates i enllaços)
+// app.js — versió robusta (detecció CTTI per codi i per nom, dates, enllaços)
 
 async function loadSnapshot(){
   const st = document.getElementById('status');
@@ -18,12 +18,7 @@ async function loadSnapshot(){
 }
 
 function fmtMoney(n){ if(n==null||n==='') return '—'; const num=Number(n); if(Number.isNaN(num)) return '—'; return num.toLocaleString('ca-ES',{style:'currency',currency:'EUR',maximumFractionDigits:0}); }
-function fmtDate(s){
-  if(!s) return '—';
-  const t = Date.parse(s);
-  if(Number.isNaN(t)) return s;
-  return new Date(t).toLocaleString('ca-ES');
-}
+function fmtDate(s){ if(!s) return '—'; const t=Date.parse(s); if(Number.isNaN(t)) return s; return new Date(t).toLocaleString('ca-ES'); }
 
 function detectServices(text){
   const t=(text||'').toLowerCase();
@@ -37,7 +32,16 @@ function detectServices(text){
   const tags=[]; buckets.forEach(([n,keys])=>{ if(keys.some(k=>t.includes(k))) tags.push(n); }); return [...new Set(tags)];
 }
 
-// 🔧 FILTRE ROBUST (CTTI com a string o número, i data)
+// 🔧 Detecció CTTI robusta (per codi o per nom)
+function isCTTI(it){
+  const code = String(it.codi_organ ?? '').trim();
+  const organ = (it.nom_organ || '').toLowerCase();
+  const byCode = code === '11110' || code === '11110.0' || code === '011110';
+  const byName = /\bctti\b/i.test(organ)
+              || /centre de telecomunicacions.*tecnologies de la informaci[oó]/i.test(organ);
+  return byCode || byName;
+}
+
 function applyFilters(items){
   const q = document.getElementById('q').value.trim().toLowerCase();
   const cttiOnly = document.getElementById('cttiOnly').checked;
@@ -47,12 +51,12 @@ function applyFilters(items){
   const minTime = min.getTime();
 
   return items.filter(it=>{
-    // Data (accepta nulls: si no hi ha data, el deixem passar per no perdre licitacions)
+    // Data (si el registre no porta data, no el descartem per no perdre licitacions)
     const t = Date.parse(it.data_publicacio_anunci || '');
     if(Number.isFinite(minTime) && Number.isFinite(t) && t < minTime) return false;
 
-    // CTTI (comparació agnòstica de tipus)
-    if(cttiOnly && String(it.codi_organ) !== '11110') return false;
+    // CTTI activat → accepteu matches per codi o nom
+    if(cttiOnly && !isCTTI(it)) return false;
 
     // Cerca lliure
     if(q){
