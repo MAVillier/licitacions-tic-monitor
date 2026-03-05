@@ -1,4 +1,4 @@
-// app.js — detecció CTTI robusta (per codi i per nom) + filtres
+// app.js — detecció CTTI robusta (per codi i per nom normalitzat) + filtres
 
 async function loadSnapshot(){
   const st = document.getElementById('status');
@@ -32,20 +32,23 @@ function detectServices(text){
   const tags=[]; buckets.forEach(([n,keys])=>{ if(keys.some(k=>t.includes(k))) tags.push(n); }); return [...new Set(tags)];
 }
 
+// Normalitza (treu diacrítics) per comparar noms
+function norm(s){ return (s||'').normalize('NFD').replace(/\p{Diacritic}/gu,'').toLowerCase(); }
+
 // ▶︎ Detecció CTTI (codi o nom)
 function isCTTI(it){
   const code  = String(it.codi_organ ?? '').trim();
-  const organ = (it.nom_organ || '').toLowerCase();
-  // codi 11110 al perfil de contractant del CTTI a la PSCP
-  // (i variacions típiques del nom oficial)
+  const organ = norm(it.nom_organ);
+  // Codi oficial del perfil CTTI a la PSCP: 11110 (pot aparèixer com a número)
   const byCode = code === '11110' || code === '11110.0' || code === '011110';
-  const byName = /\bctti\b/i.test(organ)
-              || /centre de telecomunicacions.*tecnologies de la informaci[oó]/i.test(organ);
+  // Variants habituals del nom
+  const byName = /\bctti\b/.test(organ)
+              || (organ.includes('centre de telecomunicacions') && organ.includes('tecnologies de la informacio'));
   return byCode || byName;
 }
 
 function applyFilters(items){
-  const q = document.getElementById('q').value.trim().toLowerCase();
+  const q = norm(document.getElementById('q').value.trim());
   const cttiOnly = document.getElementById('cttiOnly').checked;
   const daysBack = parseInt(document.getElementById('daysBack').value||'21',10);
 
@@ -53,17 +56,17 @@ function applyFilters(items){
   const minTime = min.getTime();
 
   return items.filter(it=>{
-    // Data (si el registre no té data, no el descartem)
+    // Data (si no porta data, no el descarto per no perdre licitacions)
     const t = Date.parse(it.data_publicacio_anunci || '');
     if(Number.isFinite(minTime) && Number.isFinite(t) && t < minTime) return false;
 
-    // Només CTTI → accepta per codi o per nom
+    // Només CTTI → accepta per codi o nom
     if(cttiOnly && !isCTTI(it)) return false;
 
     // Cerca
     if(q){
-      const title = (it.objecte_contracte||'').toLowerCase();
-      const org   = (it.nom_organ||'').toLowerCase();
+      const title = norm(it.objecte_contracte);
+      const org   = norm(it.nom_organ);
       if(!(title.includes(q) || org.includes(q))) return false;
     }
     return true;
@@ -79,6 +82,7 @@ function render(items){
     return;
   }
   filtered.forEach(it=>{
+    // enllac_publicacio pot ser string o {url:...}
     const link = (it.enllac_publicacio && it.enllac_publicacio.url)
       ? it.enllac_publicacio.url
       : (typeof it.enllac_publicacio === 'string' ? it.enllac_publicacio : '#');
