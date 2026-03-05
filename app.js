@@ -1,5 +1,8 @@
-// app.js — FILTRE CTTI ROBUST: per codi i per nom (amb normalització) + aprenentatge de codis
+// app.js — Monitor TIC (CTTI robust + auto-ampliació de dies si cal)
 
+// ───────────────────────────────────────────────────────────────────────────────
+// CÀRREGA DEL SNAPSHOT
+// ───────────────────────────────────────────────────────────────────────────────
 async function loadSnapshot(){
   const st = document.getElementById('status');
   st.textContent = 'Carregant dades (snapshot)…';
@@ -8,35 +11,50 @@ async function loadSnapshot(){
     const res = await fetch(url, { cache: 'no-store' });
     if(!res.ok) throw new Error(`HTTP ${res.status} carregant ${url}`);
     const payload = await res.json();
-    // Deriva codis CTTI existents a l'snapshot (si n'hi ha)
+
+    // Deriva codis CTTI reals presents al snapshot (si el NOM fa pinta de CTTI)
     window._cttiCodes = deriveCttiCodes(payload.items);
     console.log('[CTTI] Codis derivats al snapshot:', Array.from(window._cttiCodes));
+
     window._snapshot = payload; // { generatedAt, items }
     st.textContent = `Darrere execució: ${new Date(payload.generatedAt).toLocaleString('ca-ES')} · Total registres: ${payload.items.length}`;
-    render(payload.items);
+
+    // Aplica filtres actuals i pinta
+    applyAndRender();
   }catch(e){
     console.error('[ERROR loadSnapshot]', e);
     st.textContent = 'No s\'ha pogut carregar el snapshot. Torna-ho a provar més tard.';
   }
 }
 
-function fmtMoney(n){ if(n==null||n==='') return '—'; const num=Number(n); if(Number.isNaN(num)) return '—'; return num.toLocaleString('ca-ES',{style:'currency',currency:'EUR',maximumFractionDigits:0}); }
-function fmtDate(s){ if(!s) return '—'; const t=Date.parse(s); if(Number.isNaN(t)) return s; return new Date(t).toLocaleString('ca-ES'); }
+// ───────────────────────────────────────────────────────────────────────────────
+// FORMATEIG
+// ───────────────────────────────────────────────────────────────────────────────
+function fmtMoney(n){
+  if(n==null || n==='') return '—';
+  const num = Number(n);
+  if(Number.isNaN(num)) return '—';
+  return num.toLocaleString('ca-ES', {style:'currency', currency:'EUR', maximumFractionDigits:0});
+}
+function fmtDate(s){
+  if(!s) return '—';
+  const t = Date.parse(s);
+  if(Number.isNaN(t)) return s;
+  return new Date(t).toLocaleString('ca-ES');
+}
 
-// Normalitza (treu diacrítics) per comparar noms amb i sense accents
-function norm(s){ return (s||'').normalize('NFD').replace(/\p{Diacritic}/gu,'').toLowerCase(); }
-
-// ── DETECCIÓ CTTI ───────────────────────────────────────────────────────────────
-
-// Patró de nom per CTTI (tolerant)
+// ───────────────────────────────────────────────────────────────────────────────
+// NORMALITZACIÓ I DETECCIÓ CTTI
+// ───────────────────────────────────────────────────────────────────────────────
+function norm(s){
+  return (s||'').normalize('NFD').replace(/\p{Diacritic}/gu,'').toLowerCase();
+}
 function nameLooksCTTI(organNorm){
   if(!organNorm) return false;
   if(/\bctti\b/.test(organNorm)) return true;
-  // variants: "centre de telecomunicacions ... tecnologies de la informacio"
+  // variants: “centre de telecomunicacions … tecnologies de la informacio”
   return organNorm.includes('centre de telecomunicacions') && organNorm.includes('tecnologies de la informacio');
 }
-
-// Extreu codis CTTI presents al snapshot (si l'òrgan coincideix per nom)
 function deriveCttiCodes(items){
   const set = new Set();
   for(const it of (items||[])){
@@ -46,24 +64,23 @@ function deriveCttiCodes(items){
       if(code) set.add(code);
     }
   }
+  // Variants conegudes de l’organisme CTTI (perfil PSCP 11110)
+  ['11110','11110.0','011110'].forEach(c=>set.add(c));
   return set;
 }
-
 function isCTTI(it){
-  const code = String(it.codi_organ ?? '').trim();
+  const code  = String(it.codi_organ ?? '').trim();
   const organ = norm(it.nom_organ);
-  // 1) Si hem après codis CTTI del snapshot, prioritzem-los
-  if(window._cttiCodes && window._cttiCodes.size){
-    if(code && window._cttiCodes.has(code)) return true;
-  }
-  // 2) Codi oficial del perfil CTTI a la PSCP (11110) i variants estilitzades
-  if(code === '11110' || code === '11110.0' || code === '011110') return true;
-  // 3) Coincidència pel nom (normalitzat)
+  if(window._cttiCodes && window._cttiCodes.size && code && window._cttiCodes.has(code)) return true;
   return nameLooksCTTI(organ);
 }
+function countCTTIAll(items){
+  return (items||[]).filter(isCTTI).length;
+}
 
-// ── FILTRE I RENDER ────────────────────────────────────────────────────────────
-
+// ───────────────────────────────────────────────────────────────────────────────
+// FILTRES I RENDERITZAT
+// ───────────────────────────────────────────────────────────────────────────────
 function applyFilters(items){
   const q = norm(document.getElementById('q').value.trim());
   const cttiOnly = document.getElementById('cttiOnly').checked;
@@ -73,14 +90,14 @@ function applyFilters(items){
   const minTime = min.getTime();
 
   return items.filter(it=>{
-    // Data (si no n'hi ha, no descartar; molts registres antics o segons la font poden ometre-la)
+    // Data (si no en porta, no el descartem per no perdre licitacions)
     const t = Date.parse(it.data_publicacio_anunci || '');
     if(Number.isFinite(minTime) && Number.isFinite(t) && t < minTime) return false;
 
-    // Només CTTI → codi après, codi oficial o nom
+    // Només CTTI
     if(cttiOnly && !isCTTI(it)) return false;
 
-    // Cerca lliure
+    // Cerca
     if(q){
       const title = norm(it.objecte_contracte);
       const org   = norm(it.nom_organ);
@@ -99,18 +116,43 @@ function detectServices(text){
     ['Aplicacions',['aplicaci','software','programari','devops','api','microserveis','plataforma']],
     ['Telecom',['telecom','xarxes','wan','lan','telefonia']]
   ];
-  const tags=[]; buckets.forEach(([n,keys])=>{ if(keys.some(k=>t.includes(k))) tags.push(n); }); return [...new Set(tags)];
+  const tags=[]; buckets.forEach(([n,keys])=>{ if(keys.some(k=>t.includes(k))) tags.push(n); }); 
+  return [...new Set(tags)];
 }
 
-function render(items){
+function applyAndRender(){
+  const items = window._snapshot?.items || [];
+  if(!items.length) return;
+
+  const st = document.getElementById('status');
+  const cttiAll = countCTTIAll(items);     // CTTI totals dins del snapshot
+  let list = applyFilters(items);           // el que veu la UI ara mateix
+
+  // Si «Només CTTI» està ON, i surt 0, però sabem que n’hi ha al snapshot,
+  // prova automàticament amb 365 dies i informa a l’usuari.
+  if(document.getElementById('cttiOnly').checked && list.length === 0 && cttiAll > 0){
+    const input = document.getElementById('daysBack');
+    const original = input.value;
+    input.value = 365;
+    list = applyFilters(items);
+
+    if(list.length > 0){
+      st.textContent += ` · No hi havia CTTI amb ${original} dies; ampliat automàticament a 365 dies → ${list.length} resultats CTTI.`;
+    }else{
+      // Si ni així hi ha resultats (molt improbable si cttiAll>0), torna al valor original
+      input.value = original;
+    }
+  }
+
+  // Render
   const host = document.getElementById('cards');
-  const filtered = applyFilters(items);
   host.innerHTML='';
-  if(filtered.length===0){
+  if(list.length===0){
     host.innerHTML='<div class="empty">Sense resultats amb els filtres actuals.</div>';
     return;
   }
-  filtered.forEach(it=>{
+
+  list.forEach(it=>{
     // enllac_publicacio pot ser string o {url:...}
     const link = (it.enllac_publicacio && it.enllac_publicacio.url)
       ? it.enllac_publicacio.url
@@ -138,9 +180,10 @@ function render(items){
   });
 }
 
+// ───────────────────────────────────────────────────────────────────────────────
+// INICIALITZACIÓ
+// ───────────────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', ()=>{
-  document.getElementById('btnFilter').addEventListener('click', ()=>{
-    if(window._snapshot) render(window._snapshot.items);
-  });
+  document.getElementById('btnFilter').addEventListener('click', applyAndRender);
   loadSnapshot();
 });
