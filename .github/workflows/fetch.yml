@@ -30,7 +30,7 @@ jobs:
           mkdir -p data
           python - << 'PY'
           import json, urllib.request, datetime, sys
-          FROM = (datetime.datetime.utcnow() - datetime.timedelta(days=21)).strftime('%Y-%m-%dT00:00:00Z')
+          FROM = (datetime.datetime.utcnow() - datetime.timedelta(days=365)).strftime('%Y-%m-%dT00:00:00Z')
           URL  = 'https://analisi.transparenciacatalunya.cat/api/views/ybgg-dgi6/rows.json?accessType=DOWNLOAD&$limit=20000'
           payload=None
           try:
