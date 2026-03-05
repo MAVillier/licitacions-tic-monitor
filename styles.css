@@ -23,4 +23,3 @@ button{background:var(--accent);color:#00172a;border:0;border-radius:10px;paddin
 .actions a{flex:1;text-align:center;background:#0e1730;color:#bde2ff;border:1px solid #2a355a;padding:8px 10px;border-radius:8px;text-decoration:none}
 .actions a.primary{background:var(--accent);color:#00172a;border-color:transparent}
 .empty{opacity:0.8;color:var(--muted);padding:20px}
-.footer{padding:0 12px 20px;color:var(--muted)}
