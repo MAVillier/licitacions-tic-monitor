@@ -3,7 +3,7 @@ name: fetch
 on:
   schedule:
     - cron: '15 6 * * *'      # Diari 06:15 UTC (~07:15 CET)
-  workflow_dispatch: {}        # Botó si a pareix
+  workflow_dispatch: {}        # Botó si a pare ix
   push:
     paths:
       - '.github/workflows/fetch.yml'  # Qualsevol canvi aquí relança el workflow
