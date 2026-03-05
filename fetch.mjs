@@ -26,7 +26,7 @@ jobs:
       - name: Fetch dataset and build snapshot
         run: node fetch.mjs
         env:
-          DAYS_BACK: '20'
+          DAYS_BACK: '21'
 
       - name: Commit snapshot (built-in git, no 3rd-party action)
         run: |
