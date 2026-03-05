@@ -2,14 +2,15 @@ async function loadSnapshot(){
   const st = document.getElementById('status');
   st.textContent = 'Carregant dades (snapshot)…';
   try{
-    const res = await fetch('data/today.json', {cache:'no-store'});
-    if(!res.ok) throw new Error('HTTP '+res.status);
+    const url = new URL('data/today.json', window.location.href).toString();
+    const res = await fetch(url, { cache: 'no-store' });
+    if(!res.ok) throw new Error(`HTTP ${res.status} carregant ${url}`);
     const payload = await res.json();
     window._snapshot = payload; // { generatedAt, items }
     st.textContent = `Darrere execució: ${new Date(payload.generatedAt).toLocaleString('ca-ES')} · Total registres: ${payload.items.length}`;
     render(payload.items);
   }catch(e){
-    console.error(e);
+    console.error('[ERROR loadSnapshot]', e);
     st.textContent = 'No s\'ha pogut carregar el snapshot. Torna-ho a provar més tard.';
   }
 }
@@ -32,7 +33,7 @@ function detectServices(text){
 function applyFilters(items){
   const q = document.getElementById('q').value.trim().toLowerCase();
   const cttiOnly = document.getElementById('cttiOnly').checked;
-  const daysBack = parseInt(document.getElementById('daysBack').value||'7',10);
+  const daysBack = parseInt(document.getElementById('daysBack').value||'21',10);
   const min = new Date(); min.setHours(0,0,0,0); min.setDate(min.getDate()-daysBack);
   return items.filter(it=>{
     const pub = new Date(it.data_publicacio_anunci||0);
@@ -66,7 +67,7 @@ function render(items){
       ${it.import_adjudicacio_sense?`<div class="kv"><div>Import adjudicació</div><span>${fmtMoney(it.import_adjudicacio_sense)}</span></div>`:''}
       ${it.denominacio_adjudicatari?`<div class="kv"><div>Adjudicatari</div><span>${it.denominacio_adjudicatari}</span></div>`:''}
       <div class="actions">
-        <a class="primary" href="${link}" target="_blank">Obrir publicació oficial</a>
+        <a class="primary" href="${link}" target="_blank" rel="noopener">Obrir publicació oficial</a>
       </div>`;
     host.appendChild(el);
   });
@@ -78,4 +79,3 @@ document.addEventListener('DOMContentLoaded', ()=>{
   });
   loadSnapshot();
 });
-``
