@@ -6,7 +6,7 @@ on:
   workflow_dispatch: {}        # Botó si apareix
   push:
     paths:
-      - '.github/workflows/fetch.yml'  # Qualsevol canvi aquí relança el workflow
+      - '.github/workflows/fetch.yml'  # Qualsevol canvi aquí relança  el workflow
 
 permissions:
   contents: write
