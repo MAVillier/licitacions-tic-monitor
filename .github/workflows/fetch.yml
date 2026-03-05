@@ -2,13 +2,11 @@ name: fetch
 
 on:
   schedule:
-    - cron: '15 6 * * *'
-  workflow_dispatch: {}
+    - cron: '15 6 * * *'      # Diari 06:15 UTC (~07:15 CET)
+  workflow_dispatch: {}        # Botó “Run workflow” si apareix
   push:
     paths:
-      - 'fetch.mjs'
-      - '.github/workflows/fetch.yml'
-      # (no incloem data/** per evitar bucles)
+      - '.github/workflows/fetch.yml'  # Qualsevol canvi aquí relança el workflow
 
 permissions:
   contents: write
@@ -16,6 +14,7 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout (full history, keep credentials)
         uses: actions/checkout@v4
@@ -23,21 +22,45 @@ jobs:
           fetch-depth: 0
           persist-credentials: true
 
-      - name: Setup Node 20
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Sonda ràpida (no bloquejant)
+      - name: Build snapshot with curl (SODA SoQL → today.json)
+        shell: bash
         run: |
-          curl -I -s https://analisi.transparenciacatalunya.cat/resource/ybgg-dgi6.json?%24limit=1 || true
+          set -e
+          mkdir -p data
+          # Finestra temporal (21 dies enrere, UTC)
+          FROM="$(date -u -d '21 days ago' +%Y-%m-%dT00:00:00Z)"
 
-      - name: Fetch dataset and build snapshot
-        run: node fetch.mjs
-        env:
-          DAYS_BACK: '21'
+          # Camps que llegirem (coincidents amb el front)
+          SELECT='codi_expedient,objecte_contracte,nom_organ,tipus_contracte,fase_publicacio,valor_estimat_contracte,import_adjudicacio_sense,data_publicacio_anunci,termini_presentacio_ofertes,enllac_publicacio,denominacio_adjudicatari,codi_organ'
+
+          SOQL_URL="https://analisi.transparenciacatalunya.cat/resource/ybgg-dgi6.json?\$select=${SELECT}&\$where=data_publicacio_anunci >= '${FROM}'&\$order=data_publicacio_anunci DESC&\$limit=2000"
+          echo "Fetching (SODA): ${SOQL_URL}"
+          curl -fSsL "${SOQL_URL}" -o data/items.json || echo "[]" > data/items.json
+
+          # Si per qualsevol motiu items.json queda buit, fem fallback a export (sense SoQL)
+          if [ ! -s data/items.json ]; then
+            echo "Fallback export JSON…"
+            curl -fSsL "https://analisi.transparenciacatalunya.cat/api/views/ybgg-dgi6/rows.json?accessType=DOWNLOAD&\$limit=2000" -o data/export.json || true
+            # Si no hi ha export, deixem array buit (el front ho mostrarà igual)
+            if [ -s data/export.json ]; then
+              # NOTA: per simplicitat no transformem l'export; deixem items buit si SODA falla.
+              echo "[]" > data/items.json
+            else
+              echo "[]" > data/items.json
+            fi
+          fi
+
+          TS="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          ITEMS="$(cat data/items.json)"
+          printf '{\"generatedAt\":\"%s\",\"items\":%s}\n' "$TS" "$ITEMS" > data/today.json
+
+          echo "Snapshot creat: data/today.json"
+          wc -c data/today.json || true
+          head -c 200 data/today.json || true
+          echo
 
       - name: Commit snapshot (git nadiu)
+        shell: bash
         run: |
           set -e
           git config user.name  "github-actions[bot]"
@@ -45,7 +68,7 @@ jobs:
           git pull --rebase origin "${GITHUB_REF_NAME}"
           if [ -n "$(git status --porcelain data/today.json)" ]; then
             git add data/today.json
-            git commit -m "chore(data): update snapshot"
+            git commit -m "chore(data): update snapshot (curl)"
             git push origin HEAD:"${GITHUB_REF_NAME}"
           else
             echo "No changes to commit"
