@@ -2,7 +2,7 @@ name: fetch
 
 on:
   schedule:
-    - cron: '15 6 * * *'      # Diari 06:15 UTC (~07:15 CET)
+    - cron: '15 6 * * *'      # Diari  06:15 UTC (~07:15 CET)
   workflow_dispatch: {}        # Botó si apareix
   push:
     paths:
