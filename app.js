@@ -1,4 +1,4 @@
-// app.js — versió robusta (detecció CTTI per codi i per nom, dates, enllaços)
+// app.js — detecció CTTI robusta (per codi i per nom) + filtres
 
 async function loadSnapshot(){
   const st = document.getElementById('status');
@@ -32,10 +32,12 @@ function detectServices(text){
   const tags=[]; buckets.forEach(([n,keys])=>{ if(keys.some(k=>t.includes(k))) tags.push(n); }); return [...new Set(tags)];
 }
 
-// 🔧 Detecció CTTI robusta (per codi o per nom)
+// ▶︎ Detecció CTTI (codi o nom)
 function isCTTI(it){
-  const code = String(it.codi_organ ?? '').trim();
+  const code  = String(it.codi_organ ?? '').trim();
   const organ = (it.nom_organ || '').toLowerCase();
+  // codi 11110 al perfil de contractant del CTTI a la PSCP
+  // (i variacions típiques del nom oficial)
   const byCode = code === '11110' || code === '11110.0' || code === '011110';
   const byName = /\bctti\b/i.test(organ)
               || /centre de telecomunicacions.*tecnologies de la informaci[oó]/i.test(organ);
@@ -51,14 +53,14 @@ function applyFilters(items){
   const minTime = min.getTime();
 
   return items.filter(it=>{
-    // Data (si el registre no porta data, no el descartem per no perdre licitacions)
+    // Data (si el registre no té data, no el descartem)
     const t = Date.parse(it.data_publicacio_anunci || '');
     if(Number.isFinite(minTime) && Number.isFinite(t) && t < minTime) return false;
 
-    // CTTI activat → accepteu matches per codi o nom
+    // Només CTTI → accepta per codi o per nom
     if(cttiOnly && !isCTTI(it)) return false;
 
-    // Cerca lliure
+    // Cerca
     if(q){
       const title = (it.objecte_contracte||'').toLowerCase();
       const org   = (it.nom_organ||'').toLowerCase();
@@ -77,7 +79,6 @@ function render(items){
     return;
   }
   filtered.forEach(it=>{
-    // L'export pot donar enllac_publicacio com a string o {url:...}
     const link = (it.enllac_publicacio && it.enllac_publicacio.url)
       ? it.enllac_publicacio.url
       : (typeof it.enllac_publicacio === 'string' ? it.enllac_publicacio : '#');
