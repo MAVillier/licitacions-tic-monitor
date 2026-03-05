@@ -1,25 +1,52 @@
 name: fetch
+
 on:
   schedule:
-    - cron: '15 6 * * *'  # Diari 06:15 UTC (~07:15 CET)
+    - cron: '15 6 * * *'
   workflow_dispatch: {}
+  push:
+    paths:
+      - 'fetch.mjs'
+      - '.github/workflows/fetch.yml'
+      # (no incloem data/** per evitar bucles)
+
 permissions:
   contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Checkout (full history, keep credentials)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
         with:
           node-version: '20'
+
+      - name: Sonda ràpida (no bloquejant)
+        run: |
+          curl -I -s https://analisi.transparenciacatalunya.cat/resource/ybgg-dgi6.json?%24limit=1 || true
+
       - name: Fetch dataset and build snapshot
         run: node fetch.mjs
         env:
           DAYS_BACK: '21'
-      - name: Commit snapshot
-        uses: stefanzweifel/git-auto-commit-action@v5
-        with:
-          commit_message: 'chore(data): update snapshot'
-          file_pattern: data/today.json
-``
+
+      - name: Commit snapshot (git nadiu)
+        run: |
+          set -e
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git pull --rebase origin "${GITHUB_REF_NAME}"
+          if [ -n "$(git status --porcelain data/today.json)" ]; then
+            git add data/today.json
+            git commit -m "chore(data): update snapshot"
+            git push origin HEAD:"${GITHUB_REF_NAME}"
+          else
+            echo "No changes to commit"
+          fi
