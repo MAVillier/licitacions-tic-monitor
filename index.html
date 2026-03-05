@@ -1,2 +1,43 @@
-<link rel="stylesheet" href="styles.css">
-<script src="app.js"></script>
+<!doctype html>
+<html lang="ca">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Monitor Licitacions TIC · Generalitat</title>
+  <meta name="description"
+        content="Licitacions TIC (CTTI i Generalitat) des de Dades Obertes (PSCP) — versió Pages amb dades precalculades diàriament" />
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <h1>📡 Licitacions TIC · Generalitat</h1>
+    <p class="subtitle">Dades actualitzades diàriament (GitHub Actions) · Origen: Dades obertes (PSCP)</p>
+  </header>
+
+  <section class="controls">
+    <div class="control">
+      <label><input type="checkbox" id="cttiOnly" checked> Només CTTI</label>
+    </div>
+    <div class="control">
+      <label>Dies enrere: <input type="number" id="daysBack" min="0" max="30" value="7"/></label>
+    </div>
+    <div class="control grow">
+      <input type="search" id="q" placeholder="Cerca al títol/organisme (opcional)" />
+    </div>
+    <button id="btnFilter">Aplicar filtres</button>
+  </section>
+
+  <section id="status" class="status">Carregant dades (snapshot)…</section>
+  <main id="cards" class="cards"></main>
+
+  <footer>
+    <small>
+      Fonts: Portal de Dades Obertes — Conjunt
+      «Contractació pública a Catalunya: publicacions a la PSCP (id ybgg-dgi6)».
+      Aquesta web serveix un <em>snapshot</em> JSON precalculat diàriament via GitHub Actions.
+    </small>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
