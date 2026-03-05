@@ -1,3 +1,5 @@
+// app.js — versió robusta (CTTI numèric o text, dates i enllaços)
+
 async function loadSnapshot(){
   const st = document.getElementById('status');
   st.textContent = 'Carregant dades (snapshot)…';
@@ -16,7 +18,12 @@ async function loadSnapshot(){
 }
 
 function fmtMoney(n){ if(n==null||n==='') return '—'; const num=Number(n); if(Number.isNaN(num)) return '—'; return num.toLocaleString('ca-ES',{style:'currency',currency:'EUR',maximumFractionDigits:0}); }
-function fmtDate(s){ if(!s) return '—'; const d=new Date(s); if(Number.isNaN(d.getTime())) return s; return d.toLocaleString('ca-ES'); }
+function fmtDate(s){
+  if(!s) return '—';
+  const t = Date.parse(s);
+  if(Number.isNaN(t)) return s;
+  return new Date(t).toLocaleString('ca-ES');
+}
 
 function detectServices(text){
   const t=(text||'').toLowerCase();
@@ -30,16 +37,29 @@ function detectServices(text){
   const tags=[]; buckets.forEach(([n,keys])=>{ if(keys.some(k=>t.includes(k))) tags.push(n); }); return [...new Set(tags)];
 }
 
+// 🔧 FILTRE ROBUST (CTTI com a string o número, i data)
 function applyFilters(items){
   const q = document.getElementById('q').value.trim().toLowerCase();
   const cttiOnly = document.getElementById('cttiOnly').checked;
   const daysBack = parseInt(document.getElementById('daysBack').value||'21',10);
+
   const min = new Date(); min.setHours(0,0,0,0); min.setDate(min.getDate()-daysBack);
+  const minTime = min.getTime();
+
   return items.filter(it=>{
-    const pub = new Date(it.data_publicacio_anunci||0);
-    if(pub && pub < min) return false;
-    if(cttiOnly && it.codi_organ !== '11110') return false;
-    if(q && !( (it.objecte_contracte||'').toLowerCase().includes(q) || (it.nom_organ||'').toLowerCase().includes(q) )) return false;
+    // Data (accepta nulls: si no hi ha data, el deixem passar per no perdre licitacions)
+    const t = Date.parse(it.data_publicacio_anunci || '');
+    if(Number.isFinite(minTime) && Number.isFinite(t) && t < minTime) return false;
+
+    // CTTI (comparació agnòstica de tipus)
+    if(cttiOnly && String(it.codi_organ) !== '11110') return false;
+
+    // Cerca lliure
+    if(q){
+      const title = (it.objecte_contracte||'').toLowerCase();
+      const org   = (it.nom_organ||'').toLowerCase();
+      if(!(title.includes(q) || org.includes(q))) return false;
+    }
     return true;
   });
 }
@@ -48,9 +68,16 @@ function render(items){
   const host = document.getElementById('cards');
   const filtered = applyFilters(items);
   host.innerHTML='';
-  if(filtered.length===0){ host.innerHTML='<div class="empty">Sense resultats amb els filtres actuals.</div>'; return; }
+  if(filtered.length===0){
+    host.innerHTML='<div class="empty">Sense resultats amb els filtres actuals.</div>';
+    return;
+  }
   filtered.forEach(it=>{
-    const link = (it.enllac_publicacio && it.enllac_publicacio.url) ? it.enllac_publicacio.url : (it.enllac_publicacio||'#');
+    // L'export pot donar enllac_publicacio com a string o {url:...}
+    const link = (it.enllac_publicacio && it.enllac_publicacio.url)
+      ? it.enllac_publicacio.url
+      : (typeof it.enllac_publicacio === 'string' ? it.enllac_publicacio : '#');
+
     const tags = detectServices(it.objecte_contracte);
     const el = document.createElement('article'); el.className='card';
     el.innerHTML = `
@@ -58,7 +85,7 @@ function render(items){
       <div class="badges">
         <span class="badge">${it.nom_organ||'—'}</span>
         <span class="badge">${it.tipus_contracte||'—'}</span>
-        <span class="badge ${it.fase_publicacio?.toLowerCase().includes('adjud')?'ok':(it.fase_publicacio?.toLowerCase().includes('licit')?'warn':'')}">${it.fase_publicacio||'—'}</span>
+        <span class="badge ${String(it.fase_publicacio||'').toLowerCase().includes('adjud')?'ok':(String(it.fase_publicacio||'').toLowerCase().includes('licit')?'warn':'')}">${it.fase_publicacio||'—'}</span>
         ${tags.map(t=>`<span class="badge">${t}</span>`).join('')}
       </div>
       <div class="kv"><div>Publicació</div><span>${fmtDate(it.data_publicacio_anunci)}</span></div>
@@ -67,7 +94,7 @@ function render(items){
       ${it.import_adjudicacio_sense?`<div class="kv"><div>Import adjudicació</div><span>${fmtMoney(it.import_adjudicacio_sense)}</span></div>`:''}
       ${it.denominacio_adjudicatari?`<div class="kv"><div>Adjudicatari</div><span>${it.denominacio_adjudicatari}</span></div>`:''}
       <div class="actions">
-        <a class="primary" href="${link}" target="_blank" rel="noopener">Obrir publicació oficial</a>
+        ${link}Obrir publicació oficial</a>
       </div>`;
     host.appendChild(el);
   });
