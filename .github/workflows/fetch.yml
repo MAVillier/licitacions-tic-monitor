@@ -1,0 +1,25 @@
+name: fetch
+on:
+  schedule:
+    - cron: '15 6 * * *'  # Diari 06:15 UTC (~07:15 CET)
+  workflow_dispatch: {}
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Fetch dataset and build snapshot
+        run: node fetch.mjs
+        env:
+          DAYS_BACK: '21'
+      - name: Commit snapshot
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: 'chore(data): update snapshot'
+          file_pattern: data/today.json
+``
