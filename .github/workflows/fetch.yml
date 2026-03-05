@@ -6,7 +6,7 @@ on:
   workflow_dispatch: {}        # Botó si apareix
   push:
     paths:
-      - '.github/workflows/fetch.yml'  # Qualsevol canvi aquí relança  el workflow
+      - '.github/workflows/fetch.yml'  # Qualsevol canvi aquí relança el workflow
 
 permissions:
   contents: write
@@ -14,76 +14,72 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    env:
-      BRANCH: ${{ github.ref_name }}
 
     steps:
-      - name: Checkout branch (no detached)
+      - name: Checkout (no detached)
         uses: actions/checkout@v4
         with:
           ref: ${{ github.ref_name }}
           fetch-depth: 0
           persist-credentials: true
 
-      - name: Ensure jq is present
-        run: |
-          jq --version || (sudo apt-get update && sudo apt-get install -y jq)
-
-      - name: Build snapshot from EXPORT (rows.json) with jq
+      - name: Build snapshot from EXPORT with Python
         shell: bash
         run: |
           set -e
           mkdir -p data
-          FROM="$(date -u -d '21 days ago' +%Y-%m-%dT00:00:00Z)"
-
-          EXP_URL="https://analisi.transparenciacatalunya.cat/api/views/ybgg-dgi6/rows.json?accessType=DOWNLOAD&\$limit=20000"
-          echo "Descarregant export: $EXP_URL"
-          curl -fSsL "$EXP_URL" -o data/export.json
-
-          jq -r --arg FROM "$FROM" '
-            . as $root
-            | ($root.meta.view.columns | map(.fieldName)) as $cols
-            | $root.data
-            | [ .[]
-                | (reduce range(0; ($cols|length)) as $i ({}; . + { ($cols[$i]) : .[$i] }))
-                | {
-                    codi_expedient: .codi_expedient,
-                    objecte_contracte: (.objecte_contracte // .denominacio),
-                    nom_organ: .nom_organ,
-                    tipus_contracte: .tipus_contracte,
-                    fase_publicacio: (.fase_publicacio // .resultat),
-                    valor_estimat_contracte: .valor_estimat_contracte,
-                    import_adjudicacio_sense: .import_adjudicacio_sense,
-                    data_publicacio_anunci: (.data_publicacio_anunci // .data_publicacio),
-                    termini_presentacio_ofertes: .termini_presentacio_ofertes,
-                    enllac_publicacio: .enllac_publicacio,
-                    denominacio_adjudicatari: .denominacio_adjudicatari,
-                    codi_organ: .codi_organ
+          python - << 'PY'
+          import json, urllib.request, datetime, sys
+          FROM = (datetime.datetime.utcnow() - datetime.timedelta(days=21)).strftime('%Y-%m-%dT00:00:00Z')
+          URL  = 'https://analisi.transparenciacatalunya.cat/api/views/ybgg-dgi6/rows.json?accessType=DOWNLOAD&$limit=20000'
+          payload=None
+          try:
+              with urllib.request.urlopen(URL, timeout=180) as r:
+                  payload = json.load(r)
+          except Exception as e:
+              payload = None
+          items=[]
+          if payload:
+              cols = [c.get('fieldName') for c in payload['meta']['view']['columns']]
+              for row in payload['data']:
+                  obj = { cols[i]: row[i] for i in range(len(cols)) }
+                  item = {
+                      "codi_expedient": obj.get("codi_expedient"),
+                      "objecte_contracte": obj.get("objecte_contracte") or obj.get("denominacio"),
+                      "nom_organ": obj.get("nom_organ"),
+                      "tipus_contracte": obj.get("tipus_contracte"),
+                      "fase_publicacio": obj.get("fase_publicacio") or obj.get("resultat"),
+                      "valor_estimat_contracte": obj.get("valor_estimat_contracte"),
+                      "import_adjudicacio_sense": obj.get("import_adjudicacio_sense"),
+                      "data_publicacio_anunci": obj.get("data_publicacio_anunci") or obj.get("data_publicacio"),
+                      "termini_presentacio_ofertes": obj.get("termini_presentacio_ofertes"),
+                      "enllac_publicacio": obj.get("enllac_publicacio"),
+                      "denominacio_adjudicatari": obj.get("denominacio_adjudicatari"),
+                      "codi_organ": obj.get("codi_organ")
                   }
-                | select(.data_publicacio_anunci != null and (.data_publicacio_anunci >= $FROM))
-              ]
-          ' data/export.json > data/items.json
+                  dp = item["data_publicacio_anunci"]
+                  if dp and dp >= FROM:
+                      items.append(item)
+          out = {
+              "generatedAt": datetime.datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ'),
+              "items": items
+          }
+          with open('data/today.json','w',encoding='utf-8') as f:
+              json.dump(out, f, ensure_ascii=False)
+          print('items:', len(items))
+          PY
 
-          TS="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          ITEMS="$(cat data/items.json)"
-          printf '{\"generatedAt\":\"%s\",\"items\":%s}\n' "$TS" "$ITEMS" > data/today.json
-
-          echo "Snapshot creat: data/today.json"
-          head -c 300 data/today.json || true
-          echo
-
-      - name: Commit snapshot (git)
+      - name: Commit snapshot
         shell: bash
         run: |
           set -e
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git checkout "${BRANCH}"
-          git pull --rebase origin "${BRANCH}" || true
-          if [ -n "$(git.status --porcelain data/today.json 2>/dev/null || git status --porcelain data/today.json)" ]; then
+          git pull --rebase origin "${GITHUB_REF_NAME}" || true
+          if [ -n "$(git status --porcelain data/today.json)" ]; then
             git add data/today.json
-            git commit -m "chore(data): update snapshot (export+jq)"
-            git push origin "${BRANCH}"
+            git commit -m "chore(data): update snapshot (python)"
+            git push
           else
             echo "No changes to commit"
           fi
