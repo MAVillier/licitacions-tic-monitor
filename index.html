@@ -5,8 +5,45 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Licitacions TIC · Generalitat</title>
   <meta name="description" content="Monitor de licitacions TIC (CTTI i Generalitat) — Dades obertes PSCP (snapshot + sincronització en viu)" />
-  <link rel="icon" href="favicon.svg" type="image/svg+xml"twork com a 200 OK -->
-  <link rel="stylesheet" hrefody>
+  <link rel="icon" href="favicont{ --bg:#ffffff; --fg:#0b0f1a; --muted:#5e6b81; --card:#f7f9fc;
+      --accent:#0b5cff; --accent-ink:#ffffff; --ok:#0a7c3a; --warn:#b36b00; --border:#e5e9f2 }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial,sans-serif;background:var(--bg);color:var(--fg)}
+    .appbar{padding:18px 16px 8px;border-bottom:1px solid var(--border);background:#fff;position:sticky;top:0;z-index:5}
+    h1{margin:0;font-size:22px}
+    .subtitle{margin:4px 0 0;color:var(--muted)}
+    .controls{display:flex;gap:10px;align-items:center;padding:10px 12px;flex-wrap:wrap;border-bottom:1px solid var(--border);background:#fff}
+    .control{display:flex;align-items:center;gap:8px;color:var(--fg)}
+    .control input[type="number"], .control select{padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:#fff;color:var(--fg)}
+    .control.grow{flex:1}
+    .control.grow input[type="search"]{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:#fff;color:var(--fg)}
+    .actions-row{display:flex;gap:8px}
+    button{border:1px solid var(--border);background:#fff;color:var(--fg);border-radius:10px;padding:10px 14px;font-weight:600;cursor:pointer}
+    button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+    button.ghost:hover{background:#f4f7ff}
+    .status{padding:10px 12px;color:var(--muted)}
+    .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px;padding:12px}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px}
+    .card h3{margin:0;font-size:17px}
+    .badges{display:flex;flex-wrap:wrap;gap:6px}
+    .badge{font-size:12px;padding:4px 8px;border-radius:999px;border:1px solid var(--border);background:#fff;color:#1a2b4d}
+    .badge.ok{border-color:#bfe7cd;background:#e9fbef;color:#0b5e30}
+    .badge.warn{border-color:#ffe3b5;background:#fff8e9;color:#8b5a00}
+    .kv{display:grid;grid-template-columns:1fr auto;gap:6px;align-items:center;color:var(--muted)}
+    .kv span{white-space:nowrap}
+    .metrics{display:grid;grid-template-columns:1fr;gap:6px;padding-top:4px}
+    .metrics .row{display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:center}
+    .metrics .label{color:#2e3a55;font-weight:600}
+    .metrics .val{justify-self:end;color:#0b0f1a}
+    .actions{display:flex;gap:8px;margin-top:6px}
+    .actions a{flex:1;text-align:center;background:#fff;color:#0b5cff;border:1px solid var(--border);padding:8px 10px;border-radius:8px;text-decoration:none}
+    .actions a.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+    .foot{padding:10px 12px 22px;color:var(--muted);border-top:1px solid var(--border);background:#fff}
+    .empty{opacity:0.8;color:var(--muted);padding:20px}
+  </style>
+</head>
+<body>
   <header class="appbar">
     <h1>📡 Licitacions TIC · Generalitat</h1>
     <p class="subtitle">Dades actualitzades diàriament (GitHub Actions) · Origen: Dades obertes (PSCP)</p>
@@ -55,9 +92,53 @@
       <a href="https://analisi.transparenciacatalunya.cat/Economia/Contractaci-p-blica-a-Catalunya-publicacions-a-la-/ybgg-dgi6" target="_blank" rel="noopener">ybgg‑dgi6</a>
       (publicacions PSCP) i
       <a href="https://analisi.transparenciacatalunya.cat/api/views/hb6v-jcbf" target="_blank" rel="noopener">hb6v‑jcbf</a>
-      (històric amb durada/pròrrogues/adjudicació). La PSCP remet al Portal per a consultes automatitzades.
+      (històric amb durada/pròrrogues/adjudicació).
     </small>
   </footer>
 
-  <!-- IMPORTANT: el JS ha d'aparèixer a Network com a 200 OK -->
-  <script defer src="./app.js?v=</html>
+  <script>
+  // ==== JS INLINE ====
+  console.log('[APP] inline carregat');
+
+  // Endpoints Dades Obertes
+  const DS_PUB = 'https://analisi.transparenciacatalunya.cat';
+  const YBGG = {
+    soql: DS_PUB + '/resource/ybgg-dgi6.json',
+    exportJson: DS_PUB + '/api/views/ybgg-dgi6/rows.json?accessType=DOWNLOAD'
+  };
+  const HB6V = { soql: DS_PUB + '/resource/hb6v-jcbf.json' };
+
+  // Utilitats
+  function fmtMoney(n){ if(n==null||n==='') return '—'; const num=Number(n); if(Number.isNaN(num)) return '—'; return num.toLocaleString('ca-ES',{style:'currency',currency:'EUR',maximumFractionDigits:0}); }
+  function fmtDate(s){ if(!s) return '—'; const t=Date.parse(s); if(Number.isNaN(t)) return s; return new Date(t).toLocaleString('ca-ES'); }
+  function norm(s){ return (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase(); }
+
+  // CTTI helpers
+  function nameLooksCTTI(organNorm){
+    if(!organNorm) return false;
+    if(/\bctti\b/.test(organNorm)) return true;
+    return organNorm.includes('centre de telecomunicacions') && organNorm.includes('tecnologies de la informacio');
+  }
+  function deriveCttiCodes(items){
+    const set = new Set();
+    for(const it of (items||[])){
+      const organ = norm(it.nom_organ);
+      if(nameLooksCTTI(organ)){
+        const code = String(it.codi_organ ?? '').trim();
+        if(code) set.add(code);
+      }
+    }
+    ['11110','11110.0','011110'].forEach(c=>set.add(c));
+    return set;
+  }
+  function isCTTI(it){
+    const code = String(it.codi_organ ?? '').trim();
+    const organ = norm(it.nom_organ);
+    if(window._cttiCodes && window._cttiCodes.size && code && window._cttiCodes.has(code)) return true;
+    return nameLooksCTTI(organ);
+  }
+  function countCTTIAll(items){ return (items||[]).filter(isCTTI).length; }
+
+  // Phase filter
+  function phaseMatches(sel, fase){
+    if(!sel || sel==='tots') return true;
