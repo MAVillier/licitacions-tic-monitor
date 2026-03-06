@@ -39,4 +39,3 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
 .empty { color: var(--muted); padding: 18px 20px; }
 
 .app-footer { padding: 16px 20px; border-top: 1px solid rgba(255,255,255,0.06); color: var(--muted); }
-``
