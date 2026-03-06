@@ -30,6 +30,11 @@
     .badge{font-size:12px;padding:4px 8px;border-radius:999px;border:1px solid var(--border);background:#fff;color:#1a2b4d}
     .badge.ok{border-color:#bfe7cd;background:#e9fbef;color:#0b5e30}
     .badge.warn{border-color:#ffe3b5;background:#fff8e9;color:#8b5a00}
+    /* Organisme licitador ressaltat */
+    .badge.org{
+      background:var(--accent); color:var(--accent-ink); border-color:var(--accent);
+      font-weight:700
+    }
     .kv{display:grid;grid-template-columns:1fr auto;gap:6px;align-items:center;color:var(--muted)}
     .kv span{white-space:nowrap}
     .metrics{display:grid;grid-template-columns:1fr;gap:6px;padding-top:4px}
@@ -99,8 +104,8 @@
 
   <footer class="foot">
     <small>
-      Filtre TIC basat en CPV (**72…** serveis TI; **48…** software/sistemes; **302…** equip informàtic; **324…** xarxes) i paraules clau.  
-      CPV: vocabulari comú oficial de la UE; fitxa i *LOD* per **72000000‑5**, **48000000‑8**, **32400000**. [1](https://web-archive.southampton.ac.uk/cpv.data.ac.uk/code-72000000.html)[2](https://cpv.pm/divisions/72/?hl=en)[4](https://web-archive.southampton.ac.uk/cpv.data.ac.uk/code-48000000.html)[6](https://contratos.gobierto.es/cpv/browser?cpv_id=32400000)
+      Filtre TIC: CPV **72…** (Serveis TI), **48…** (Programari/SI), **302…** (equip informàtic), **324…** (xarxes) + paraules clau TIC.  
+      CPV oficial UE i llistat obert: 72000000‑5, 48000000‑8, 32400000… [1](https://analisi.transparenciacatalunya.cat/ca/login)[2](https://empresite.eleconomista.es/CENTRO-TELECOMUNICACIONES-GENERALITAT-CATALUNA.html)[3](https://analisi.transparenciacatalunya.cat/d/ybgg-dgi6/visualization)
     </small>
   </footer>
 
@@ -152,7 +157,7 @@
       'codi_expedient','objecte_contracte','nom_organ','tipus_contracte','fase_publicacio',
       'valor_estimat_contracte','import_adjudicacio_sense','data_publicacio_anunci',
       'termini_presentacio_ofertes','enllac_publicacio','denominacio_adjudicatari','codi_organ',
-      'codi_cpv','cpv','cpv_principal' // si existeixen
+      'codi_cpv','cpv','cpv_principal'
     ].join(',');
 
     const soql = new URL(YBGG.soql);
@@ -194,7 +199,7 @@
   }
 
   function normalizeYBGG(it){
-    // Harmonitza possibles noms de camp (export)
+    // Harmonitza possibles noms de camp CPV (si arriben en export)
     const guessCPV =
       it.codi_cpv || it.cpv || it.cpv_principal || it["CODI CPV"] || it["codi cpv"] || it["cpv principal"];
     return {
@@ -249,46 +254,59 @@
     return ORG_PATTERNS.some(p => organ.includes(p));
   }
 
-  // ===== TIC (CPV + paraules clau)
-  const TIC_CPV_PREFIXES = [
-    // Serveis TI (72…)
-    '720','721','722','723','724','725','726','727','728','729',
-    // Software i sistemes d'info (48… + 488/489…)
-    '480','481','482','483','484','485','486','487','488','489',
-    // HW informàtic (302…)
-    '302',
-    // Xarxes (324…)
-    '324'
-  ];
+  // ===== TIC (CPV + paraules clau, amb llista negra) =====
+  const TIC_CPV_ALLOW_2 = ['72','48'];   // divisions
+  const TIC_CPV_ALLOW_3 = ['302','324']; // grups
+  const NON_TIC_CPV_DENY_2 = [ '03','14','15','18','22','33','34','38','39','44','45','50','55','60','90' ];
   const TIC_KEYWORDS = [
-    'tic','informatic','informàtic','informatica','informática','software','programari','aplicaci','app',
-    'servidor','servidors','server','cpd','datacenter','núvol','nuvol','cloud',
+    'tic','informatic','informàtic','informatica','informática',
+    'software','programari','aplicaci','app','erp','crm',
+    'servidor','server','cpd','datacenter','núvol','nuvol','cloud',
     'xarxa','lan','wan','wifi','wi-fi','network','switch','router','firewall','proxy','vpn','sd-wan',
     'ciber','seguretat','security','soc','siem','ids','ips',
     'plataforma','microserveis','api','devops','kubernetes','docker',
-    'bases de dades','base de dades','database','sql','oracle','sap','erp','crm',
+    'bases de dades','base de dades','database','sql','oracle','sap',
     'outsystems','low-code','no-code'
+  ].map(norm);
+  const NON_TIC_WORDS = [
+    'higiene','sanitari','farmac','farmacèutic','material sanitari','guant','bata',
+    'vehicle','cotxe','automobil','automòbil','furgoneta','renting',
+    'obra','obres','constru','arquitect','redaccio de projecte','projecte basic','projecte bàsic','direccio d’obra','direcció d’obra',
+    'neteja','catering','menjar','aliment','uniforme','roba de treball','mobiliari','impremta','papereria',
+    'residu','recollida residus','jardineria'
   ].map(norm);
 
   function getCPV(it){
     const cpv = it.cpv || it.codi_cpv || it.cpv_principal;
     if(!cpv) return null;
     const s = String(cpv).trim();
-    const digits = s.replace(/[^\d]/g,''); // treu guions/control
+    const digits = s.replace(/[^\d]/g,'');
     return digits || null;
   }
+  function startsWithAny(s, arr){ return arr.some(p => s.startsWith(p)); }
+
   function looksTICByCPV(it){
     const cpv = getCPV(it);
-    if(!cpv) return false;
-    return TIC_CPV_PREFIXES.some(pref => cpv.startsWith(pref));
+    if(!cpv) return null; // desconegut
+    // Permesos
+    if(startsWithAny(cpv, TIC_CPV_ALLOW_2)) return true;
+    if(startsWithAny(cpv, TIC_CPV_ALLOW_3)) return true;
+    // Denegats comuns
+    if(startsWithAny(cpv, NON_TIC_CPV_DENY_2)) return false;
+    // Si cap regla, ens quedem amb “no concloent”
+    return null;
   }
   function looksTICByText(it){
     const t = norm((it.objecte_contracte||'')+' '+(it.tipus_contracte||''));
+    if(NON_TIC_WORDS.some(k => t.includes(k))) return false;
     return TIC_KEYWORDS.some(k => t.includes(k));
   }
   function isTIC(it){
-    // Si tenim CPV, prima CPV; sinó, fem servir paraules clau al títol
-    return looksTICByCPV(it) || looksTICByText(it);
+    const byCPV = looksTICByCPV(it);
+    if(byCPV === true) return true;
+    if(byCPV === false) return false;
+    // Si el CPV no hi és o no conclou, avaluem el text
+    return looksTICByText(it);
   }
 
   // ===== Filtres =====
@@ -361,6 +379,14 @@
     return isFinite(p) ? p : null;
   }
 
+  function getCPV(it){
+    const cpv = it.cpv || it.codi_cpv || it.cpv_principal;
+    if(!cpv) return null;
+    const s = String(cpv).trim();
+    const digits = s.replace(/[^\d]/g,'');
+    return digits || null;
+  }
+
   function renderCard(it, host){
     const link = (it.enllac_publicacio && it.enllac_publicacio.url)
       ? it.enllac_publicacio.url
@@ -368,16 +394,20 @@
 
     const tags = detectServices(it.objecte_contracte);
     const fase = String(it.fase_publicacio||'').toLowerCase();
-    const pct  = percentDiscount(it.valor_estimat_contracte, it.import_adjudicacio_sense);
+    const cpv  = getCPV(it);
+
+    // Descompte només si és ADJUDICACIÓ
+    const showDiscount = fase.includes('adjud');
+    const pct  = showDiscount ? percentDiscount(it.valor_estimat_contracte, it.import_adjudicacio_sense) : null;
 
     const el = document.createElement('article'); el.className='card';
     el.innerHTML = `
       <h3>${(it.objecte_contracte||'Sense títol').replace(/</g,'&lt;')}</h3>
       <div class="badges">
-        <span class="badge">${it.nom_organ||'—'}</span>
+        <span class="badge org">${it.nom_organ||'—'}</span>
         <span class="badge">${it.tipus_contracte||'—'}</span>
         <span class="badge ${fase.includes('adjud')?'ok':(fase.includes('licit')?'warn':'')}">${it.fase_publicacio||'—'}</span>
-        ${getCPV(it)?`<span class="badge">CPV ${getCPV(it)}</span>`:''}
+        ${cpv?`<span class="badge">CPV ${cpv}</span>`:''}
         ${tags.map(t=>`<span class="badge">${t}</span>`).join('')}
       </div>
 
@@ -388,17 +418,18 @@
         <div class="row"><div class="label">Valor</div>
           <div class="val">
             ${fmtMoney(it.valor_estimat_contracte)}
-            ${it.import_adjudicacio_sense?` · adjudicació: ${fmtMoney(it.import_adjudicacio_sense)}`:''}
-            ${pct!=null?` · descompte: ${pct.toFixed(1)}%`:''}
+            ${showDiscount && it.import_adjudicacio_sense?` · adjudicació: ${fmtMoney(it.import_adjudicacio_sense)}`:''}
+            ${showDiscount && pct!=null?` · descompte: ${pct.toFixed(1)}%`:''}
           </div>
         </div>
-        ${fase.includes('adjud') && it.denominacio_adjudicatari ? `
+        ${showDiscount && it.denominacio_adjudicatari ? `
           <div class="row"><div class="label">Adjudicatari</div><div class="val">${it.denominacio_adjudicatari}</div></div>
         ` : ``}
       </div>
 
       <div class="actions">
-        <a href="${link}" target="_blank" class   </div>
+        <a href="${link}" target="_cial</a>
+      </div>
     `;
     host.appendChild(el);
   }
