@@ -3,41 +3,58 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Monitor Licitacions TIC · Generalitat</title>
-  <meta name="description" content="Licitacions TIC (CTTI i Generalitat) des de Dades Obertes (PSCP) — versió Pages amb dades precalculades diàriament" />
-  <link rel="stylesheet" href="styles.css" />
-  <link rel="stylesheet" href="styles.css" />
-  <link rel="icon" href="favicon.svg"/>
-</head>
-<body>
-  <header>
+  <title>Licitacions TIC · Generalitat</title>
+  <meta name="description" content="Monitor de licitacions TIC (CTTI i Generalitat) — Dades obertes PSCP (snapshot + sincronització en viu)" />
+  <link rel="icon" href="favicon.svgt" href="styles class="appbar">
     <h1>📡 Licitacions TIC · Generalitat</h1>
     <p class="subtitle">Dades actualitzades diàriament (GitHub Actions) · Origen: Dades obertes (PSCP)</p>
   </header>
 
   <section class="controls">
-    <div class="control">
-      <label><input type="checkbox" id="cttiOnly" checked> Només CTTI</label>
-    </div>
-    <div class="control">
-      <label>Dies enrere: <input type="number" id="daysBack" min="0" max="180" value="21"/></label>
-    </div>
+    <label class="control">
+      <input type="checkbox" id="cttiOnly" checked />
+      <span>Només CTTI</span>
+    </label>
+
+    <label class="control">
+      <span>Dies enrere:</span>
+      <input type="number" id="daysBack" min="0" max="365" value="21" />
+    </label>
+
+    <label class="control">
+      <span>Estat:</span>
+      <select id="phaseFilter">
+        <option value="licitacio" selected>Licitació (per defecte)</option>
+        <option value="adjudicacio">Adjudicació</option>
+        <option value="formalitzacio">Formalització</option>
+        <option value="execucio">Execució</option>
+        <option value="anul_desert">Anul·lació / Desert</option>
+        <option value="tots">TOTS</option>
+      </select>
+    </label>
+
     <div class="control grow">
       <input type="search" id="q" placeholder="Cerca al títol/organisme (opcional)" />
     </div>
-    <button id="btnFilter">Aplicar filtres</button>
+
+    <div class="actions-row">
+      <button id="btnFilter" class="primary">Aplicar filtres</button>
+      <button id="btnSync" class="ghost" title="Força una sincronització live amb el portal">Sincronitza</button>
+    </div>
   </section>
 
   <section id="status" class="status">Carregant dades (snapshot)…</section>
+
   <main id="cards" class="cards"></main>
 
-  <footer>
+  <footer class="foot">
     <small>
-      Fonts: Portal de Dades Obertes — Conjunt «Contractació pública a Catalunya: publicacions a la PSCP (id ybgg-dgi6)».
-      Aquesta web serveix un <em>snapshot</em> JSON precalculat diàriament via GitHub Actions.
+      Fonts: <strong>Portal de Dades Obertes</strong> — conjunt
+      <a href="https://analisi.transparenciacatalunya.cat/Economia/Contractaci-p-blica-a-Catalunya-publicacions-a-la-/ybgg-dgi6" target="_blank" rel="noopener">ybgg‑dgi6</a> (publicacions PSCP) i
+      <a href="https://analisi.transparenciacatalunya.cat/api/views/hb6v-jcbf" target="_blank" rel="noopener">hb6v‑jcbf</a> (històric amb durada/pròrrogues/adjudicació). La PSCP recomana el Portal per a consultes automatitzades.
     </small>
   </footer>
 
-  <script src="app.js"></script>
+  <script srcipt>
 </body>
 </html>
