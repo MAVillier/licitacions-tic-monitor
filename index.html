@@ -30,10 +30,8 @@
     .badge{font-size:12px;padding:4px 8px;border-radius:999px;border:1px solid var(--border);background:#fff;color:#1a2b4d}
     .badge.ok{border-color:#bfe7cd;background:#e9fbef;color:#0b5e30}
     .badge.warn{border-color:#ffe3b5;background:#fff8e9;color:#8b5a00}
-    /* Organisme licitador ressaltat */
     .badge.org{
-      background:var(--accent); color:var(--accent-ink); border-color:var(--accent);
-      font-weight:700
+      background:var(--accent); color:var(--accent-ink); border-color:var(--accent); font-weight:700
     }
     .kv{display:grid;grid-template-columns:1fr auto;gap:6px;align-items:center;color:var(--muted)}
     .kv span{white-space:nowrap}
@@ -104,8 +102,7 @@
 
   <footer class="foot">
     <small>
-      Filtre TIC: CPV **72…** (Serveis TI), **48…** (Programari/SI), **302…** (equip informàtic), **324…** (xarxes) + paraules clau TIC.  
-      CPV oficial UE i llistat obert: 72000000‑5, 48000000‑8, 32400000… [1](https://analisi.transparenciacatalunya.cat/ca/login)[2](https://empresite.eleconomista.es/CENTRO-TELECOMUNICACIONES-GENERALITAT-CATALUNA.html)[3](https://analisi.transparenciacatalunya.cat/d/ybgg-dgi6/visualization)
+      Filtre TIC basat en CPV: **72…** (Serveis TI), **48…** (Programari/SI), **302…** (equip informàtic), **324…** (xarxes); CPV divisions no‑TIC (p. ex. 33/39/44/45) s’exclouen. El CPV és el vocabulari oficial de la UE. [1](https://analisi.transparenciacatalunya.cat/ca/login)[2](https://empresite.eleconomista.es/CENTRO-TELECOMUNICACIONES-GENERALITAT-CATALUNA.html)[3](https://analisi.transparenciacatalunya.cat/d/ybgg-dgi6/visualization)[4](blob:https://outlook.office.com/6d17cc3c-99e2-4b6c-9b15-d317463626ca)
     </small>
   </footer>
 
@@ -254,11 +251,13 @@
     return ORG_PATTERNS.some(p => organ.includes(p));
   }
 
-  // ===== TIC (CPV + paraules clau, amb llista negra) =====
-  const TIC_CPV_ALLOW_2 = ['72','48'];   // divisions
-  const TIC_CPV_ALLOW_3 = ['302','324']; // grups
-  const NON_TIC_CPV_DENY_2 = [ '03','14','15','18','22','33','34','38','39','44','45','50','55','60','90' ];
+  // ===== TIC (CPV + paraules clau, amb llista negra reforçada) =====
+  const TIC_CPV_ALLOW_2 = ['72','48'];   // divisions (Serveis TI, Programari/SI)
+  const TIC_CPV_ALLOW_3 = ['302','324']; // grups (HW informàtic, Xarxes)
+  const NON_TIC_CPV_DENY_2 = [ '03','14','15','18','22','33','34','35','36','37','38','39','41','42','43','44','45','50','55','60','90' ];
+
   const TIC_KEYWORDS = [
+    // ca/es/en
     'tic','informatic','informàtic','informatica','informática',
     'software','programari','aplicaci','app','erp','crm',
     'servidor','server','cpd','datacenter','núvol','nuvol','cloud',
@@ -266,14 +265,23 @@
     'ciber','seguretat','security','soc','siem','ids','ips',
     'plataforma','microserveis','api','devops','kubernetes','docker',
     'bases de dades','base de dades','database','sql','oracle','sap',
-    'outsystems','low-code','no-code'
+    'outsystems','low-code','no-code','telecomunic'
   ].map(norm);
+
   const NON_TIC_WORDS = [
-    'higiene','sanitari','farmac','farmacèutic','material sanitari','guant','bata',
-    'vehicle','cotxe','automobil','automòbil','furgoneta','renting',
-    'obra','obres','constru','arquitect','redaccio de projecte','projecte basic','projecte bàsic','direccio d’obra','direcció d’obra',
-    'neteja','catering','menjar','aliment','uniforme','roba de treball','mobiliari','impremta','papereria',
-    'residu','recollida residus','jardineria'
+    // sanitaris/farmaci/consumibles
+    'higiene','sanitari','sanitario','farmac','farmacèutic','farmacéutico','cateter','catèter','cateteres','catéter',
+    'quirurg','quirúrg','quirófano','quiròfan','bata','guant','guantes','gasa','apòsit','apósito','detergent','sabon','sabó',
+    // mobiliari/utillatge
+    'mobiliari','mobiliario','cadira','cadire','silla','taula','mesa','armari','carro','cadires','butaques',
+    // obres/infra no tic
+    'obra','obres','constru','arquitect','redaccio de projecte','redacción del proyecto','projecte basic','projecte bàsic','direccio d’obra','dirección de obra',
+    'paviment','pintura','fusteria','ascensor','climatitzacio','climatización','caldera','aigua','hidraulic','hidràulic','tèrmic','térmico',
+    // vehicles/neteja/alimentació/altres
+    'vehicle','vehículo','cotxe','automobil','automóvil','furgoneta','renting','combustible','gasoli','gasolina','diesel',
+    'neteja','limpieza','bugaderia','lavandería','residu','residuos',
+    'càtering','catering','aliment','comida','menjar','fruita','fruta','pa','llet','leche',
+    'papereria','papeleria','impremta','imprenta','tèxtil','textil','uniforme'
   ].map(norm);
 
   function getCPV(it){
@@ -287,25 +295,29 @@
 
   function looksTICByCPV(it){
     const cpv = getCPV(it);
-    if(!cpv) return null; // desconegut
-    // Permesos
+    if(!cpv) return null; // sense CPV → decidir per text
+    // Allowlist forta
     if(startsWithAny(cpv, TIC_CPV_ALLOW_2)) return true;
     if(startsWithAny(cpv, TIC_CPV_ALLOW_3)) return true;
-    // Denegats comuns
+    // Denylist de divisions no‑TIC
     if(startsWithAny(cpv, NON_TIC_CPV_DENY_2)) return false;
-    // Si cap regla, ens quedem amb “no concloent”
+    // Sense conclusió → fem servir text
     return null;
   }
+
   function looksTICByText(it){
     const t = norm((it.objecte_contracte||'')+' '+(it.tipus_contracte||''));
+    // si conté alguna paraula no‑TIC, descartem
     if(NON_TIC_WORDS.some(k => t.includes(k))) return false;
+    // exigim com a mínim una paraula TIC
     return TIC_KEYWORDS.some(k => t.includes(k));
   }
+
   function isTIC(it){
     const byCPV = looksTICByCPV(it);
-    if(byCPV === true) return true;
+    if(byCPV === true)  return true;
     if(byCPV === false) return false;
-    // Si el CPV no hi és o no conclou, avaluem el text
+    // Si CPV absent o indeterminat, avaluem text amb llista negra estricta
     return looksTICByText(it);
   }
 
@@ -338,10 +350,7 @@
       if(Number.isFinite(minTime) && Number.isFinite(t) && t < minTime) return false;
       if(!phaseMatches(phaseSel, it.fase_publicacio)) return false;
 
-      // TIC primer (per defecte ON)
       if(onlyTIC && !isTIC(it)) return false;
-
-      // Exclusió/selecció per CTTI/Organismes
       if(onlyCTTI && !isCTTI(it)) return false;
       if(onlyOrgs && !isOrganismeGencat(it)) return false;
 
@@ -379,14 +388,6 @@
     return isFinite(p) ? p : null;
   }
 
-  function getCPV(it){
-    const cpv = it.cpv || it.codi_cpv || it.cpv_principal;
-    if(!cpv) return null;
-    const s = String(cpv).trim();
-    const digits = s.replace(/[^\d]/g,'');
-    return digits || null;
-  }
-
   function renderCard(it, host){
     const link = (it.enllac_publicacio && it.enllac_publicacio.url)
       ? it.enllac_publicacio.url
@@ -396,7 +397,7 @@
     const fase = String(it.fase_publicacio||'').toLowerCase();
     const cpv  = getCPV(it);
 
-    // Descompte només si és ADJUDICACIÓ
+    // Mostrar descompte/adjudicatari NOMÉS si fase ~ adjudicació
     const showDiscount = fase.includes('adjud');
     const pct  = showDiscount ? percentDiscount(it.valor_estimat_contracte, it.import_adjudicacio_sense) : null;
 
@@ -428,10 +429,18 @@
       </div>
 
       <div class="actions">
-        <a href="${link}" target="_cial</a>
+        <a href="${link}"icació oficial</a>
       </div>
     `;
     host.appendChild(el);
+  }
+
+  function getCPV(it){
+    const cpv = it.cpv || it.codi_cpv || it.cpv_principal;
+    if(!cpv) return null;
+    const s = String(cpv).trim();
+    const digits = s.replace(/[^\d]/g,'');
+    return digits || null;
   }
 
   function detectServices(text){
@@ -462,3 +471,4 @@
   </script>
 </body>
 </html>
+``
