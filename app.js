@@ -1,4 +1,5 @@
 // app.js — Monitor TIC (tema clar + estat + sincronitza + CTTI + enriquiment beta)
+console.log('[APP] app.js carregat');
 
 // Endpoints Dades Obertes
 const DS_PUB = 'https://analisi.transparenciacatalunya.cat';
@@ -8,29 +9,22 @@ const YBGG = {
 };
 const HB6V = { soql: DS_PUB + '/resource/hb6v-jcbf.json' };
 
-// --- Utilitats ---
-function fmtMoney(n){
-  if(n==null || n==='') return '—';
-  const num = Number(n); if(Number.isNaN(num)) return '—';
-  return num.toLocaleString('ca-ES',{style:'currency',currency:'EUR',maximumFractionDigits:0});
-}
-function fmtDate(s){
-  if(!s) return '—';
-  const t = Date.parse(s); if(Number.isNaN(t)) return s;
-  return new Date(t).toLocaleString('ca-ES');
-}
-// Compat: treu diacrítics sense \p{Diacritic}
+// Utilitats
+function fmtMoney(n){ if(n==null||n==='') return '—'; const num=Number(n); if(Number.isNaN(num)) return '—'; return num.toLocaleString('ca-ES',{style:'currency',currency:'EUR',maximumFractionDigits:0}); }
+function fmtDate(s){ if(!s) return '—'; const t=Date.parse(s); if(Number.isNaN(t)) return s; return new Date(t).toLocaleString('ca-ES'); }
 function norm(s){ return (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase(); }
 
-// --- Càrrega del snapshot ---
+// Càrrega snapshot
 async function loadSnapshot(){
   const st = document.getElementById('status');
   st.textContent = 'Carregant dades (snapshot)…';
   try{
     const url = new URL('data/today.json', window.location.href).toString();
     const res = await fetch(url, { cache:'no-store' });
+    console.log('[APP] GET', url, res.status);
     if(!res.ok) throw new Error(`HTTP ${res.status} carregant ${url}`);
     const payload = await res.json();
+    console.log('[APP] snapshot items:', payload.items?.length ?? '—');
 
     window._cttiCodes = deriveCttiCodes(payload.items);
     console.log('[CTTI] Codis derivats al snapshot:', Array.from(window._cttiCodes));
@@ -40,11 +34,11 @@ async function loadSnapshot(){
     applyAndRender();
   }catch(e){
     console.error('[ERROR loadSnapshot]', e);
-    document.getElementById('status').textContent = 'No s\'ha pogut carregar el snapshot. Revisa que existeixi data/today.json a l’arrel.';
+    st.textContent = 'No s\'ha pogut carregar el snapshot. Revisa que existeixi data/today.json a l’arrel.';
   }
 }
 
-// --- Sincronització live ---
+// Sincronització live
 async function forceSync(){
   const st = document.getElementById('status');
   st.textContent = 'Sincronitzant amb el portal…';
@@ -65,6 +59,7 @@ async function forceSync(){
 
   try{
     const r = await fetch(soql.toString(), { cache:'no-store' });
+    console.log('[SYNC] SODA', r.status);
     if(!r.ok) throw new Error('SODA '+r.status);
     const arr = await r.json();
     const payload = { generatedAt:new Date().toISOString(), items: arr };
@@ -76,6 +71,7 @@ async function forceSync(){
     console.warn('[SYNC] SODA KO, provem export', err);
     try{
       const exp = await fetch(YBGG.exportJson, { cache:'no-store' });
+      console.log('[SYNC] EXPORT', exp.status);
       if(!exp.ok) throw new Error('EXPORT '+exp.status);
       const data = await exp.json();
       const cols = data.meta.view.columns.map(c=>c.fieldName);
@@ -110,7 +106,7 @@ function normalizeYBGG(it){
   };
 }
 
-// --- CTTI (per codi i per nom) ---
+// CTTI
 function nameLooksCTTI(organNorm){
   if(!organNorm) return false;
   if(/\bctti\b/.test(organNorm)) return true;
@@ -136,7 +132,7 @@ function isCTTI(it){
 }
 function countCTTIAll(items){ return (items||[]).filter(isCTTI).length; }
 
-// --- Filtre per estat + CTTI + dies + cerca ---
+// Filtre per estat + CTTI + dies + cerca
 function phaseMatches(sel, fase){
   if(!sel || sel==='tots') return true;
   const f = norm(fase||'');
@@ -173,8 +169,8 @@ function applyFilters(items){
   });
 }
 
-// --- Enriquiment (hb6v-jcbf) ---
-const _enrichCache = new Map(); // key: codi|organ
+// Enriquiment (hb6v-jcbf)
+const _enrichCache = new Map();
 async function enrichFromHB6(code, organ, title){
   const key = String(code||'') + '|' + String(organ||'');
   if(_enrichCache.has(key)) return _enrichCache.get(key);
@@ -182,8 +178,7 @@ async function enrichFromHB6(code, organ, title){
   const sel = [
     'codi_expedient','organisme_contractant','descripcio_expedient',
     'import_adjudicacio','data_adjudicacio',
-    'durada_mesos','durada_anys','numero_prorroga','data_inici_prorroga','data_fi_prorroga',
-    'adjudicatari'
+    'durada_mesos','durada_anys','numero_prorroga','data_inici_prorroga','data_fi_prorroga','adjudicatari'
   ].join(',');
 
   const wh = [];
@@ -196,6 +191,7 @@ async function enrichFromHB6(code, organ, title){
 
   try{
     const r = await fetch(q.toString(), { cache:'no-store' });
+    console.log('[ENR] hb6v by code/organ', r.status);
     const arr = r.ok ? await r.json() : [];
     const best = Array.isArray(arr)&&arr.length? arr[0] : null;
 
@@ -212,6 +208,7 @@ async function enrichFromHB6(code, organ, title){
         q2.searchParams.set('$order', 'data_adjudicacio DESC');
         q2.searchParams.set('$limit', '5');
         const r2 = await fetch(q2.toString(), { cache:'no-store' });
+        console.log('[ENR] hb6v by tokens', r2.status);
         const a2 = r2.ok ? await r2.json() : [];
         prevGuess = Array.isArray(a2)&&a2.length? a2[0] : null;
       }
@@ -253,7 +250,7 @@ function composeAnterior(row){
   };
 }
 
-// --- Render + autoampliació si cal ---
+// Render + autoampliació si cal
 function applyAndRender(){
   const items = window._snapshot?.items || [];
   if(!items.length) return;
@@ -313,7 +310,7 @@ function renderCard(it, host){
     </div>
 
     <div class="actions">
-      ${link}Obrir publicació oficial</a>
+      <a href="${link}" target="_blank/a>
       <a href="https://contractaciopublica.cat/ca/inici" target="_blank" rel="noopener">PSCP</a>
     </div>
   `;
@@ -335,7 +332,7 @@ function renderCard(it, host){
   }).catch(()=>{});
 }
 
-// --- Tags serveis ---
+// Tags serveis
 function detectServices(text){
   const t=(text||'').toLowerCase();
   const buckets=[
@@ -349,9 +346,8 @@ function detectServices(text){
   return [...new Set(tags)];
 }
 
-// --- Inici ---
+// Inici
 document.addEventListener('DOMContentLoaded', ()=>{
-  // Per defecte l’estat és “Licitació”
   document.getElementById('phaseFilter').value = 'licitacio';
   document.getElementById('btnFilter').addEventListener('click', applyAndRender);
   document.getElementById('btnSync').addEventListener('click', forceSync);
