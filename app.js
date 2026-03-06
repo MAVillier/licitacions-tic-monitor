@@ -12,6 +12,7 @@ const HB6V = { soql: DS_PUB + '/resource/hb6v-jcbf.json' };
 // Utilitats
 function fmtMoney(n){ if(n==null||n==='') return '—'; const num=Number(n); if(Number.isNaN(num)) return '—'; return num.toLocaleString('ca-ES',{style:'currency',currency:'EUR',maximumFractionDigits:0}); }
 function fmtDate(s){ if(!s) return '—'; const t=Date.parse(s); if(Number.isNaN(t)) return s; return new Date(t).toLocaleString('ca-ES'); }
+// Eliminem diacrítics sense usar \p{Diacritic}
 function norm(s){ return (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase(); }
 
 // Càrrega snapshot
@@ -184,6 +185,7 @@ async function enrichFromHB6(code, organ, title){
   const wh = [];
   if(code) wh.push(`codi_expedient = '${String(code).replace(/'/g,"''")}'`);
   if(organ) wh.push(`lower(organisme_contractant) like '%${norm(organ).replace(/'/g,"''")}%'`);
+
   const q = new URL(HB6V.soql);
   q.searchParams.set('$select', sel);
   q.searchParams.set('$where', wh.length? wh.join(' AND ') : '1=1');
@@ -310,7 +312,7 @@ function renderCard(it, host){
     </div>
 
     <div class="actions">
-      <a href="${link}" target="_blank/a>
+      <a href="${link}" target="_cial</a>
       <a href="https://contractaciopublica.cat/ca/inici" target="_blank" rel="noopener">PSCP</a>
     </div>
   `;
