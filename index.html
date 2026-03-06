@@ -4,10 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Licitacions TIC – filtre CPV a origen</title>
-  styles.css
-</head>
-<body>
-  <header class="app-header">
+  <link rel="stylesheet" href="./styles.css?v=2"s="app-header">
     <h1>Licitacions TIC</h1>
     <p class="subtitle">Vista zero-config: dades de la PSCP (Catalunya) amb filtre TIC a l'API</p>
   </header>
@@ -33,14 +30,9 @@
     <small>© 2026 · Zero-config sobre <code>analisi.transparenciacatalunya.cat</code> · Dataset <code>ybgg-dgi6</code></small>
   </footer>
 
-  app.js</script>
-  <script>
-    document.addEventListener('DOMContentLoaded', () => {
-      const sel = document.getElementById('sortBy');
-      if (sel) sel.addEventListener('change', () => App.forceSync());
-      document.getElementById('btnSync')?.addEventListener('click', () => App.forceSync());
-      App.forceSync();
-    });
-  </script>
-</body>
+  <noscript>
+    <div class="alert error">Aquest lloc necessita JavaScript per carregar les licitacions.</div>
+  </noscript>
+
+  <script src="./app.js?v=2"dy>
 </html>
